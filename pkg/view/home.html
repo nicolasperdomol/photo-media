@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8"/>
+        <title>Photomedia</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+        <link rel="stylesheet" href="css/home.css">
+    </head>
+    <body onload="loadBody()">
+        
+        <header class="container g-0">
+            <div class="row g-0">
+                <div class="col g-0">
+                    <!--CREATE POST HIDDEN-->
+                    <div id="card-form" class="create-card-form hidden">
+                        <form method="POST" action="/home/card">
+                            <input id="author" type="hidden" name="author" value="">
+                            <input id="session" type="hidden" name="session" value="">
+                            
+                            <label>Image(url): <input type="text" name="image"></label>
+                            <label>Description: <input type="text" name="description"></label>
+                            <input type="submit" value="Create card!">
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-0">
+                <div class="col g-0">&nbsp;</div>
+                <div class="col g-0"><p id="username">&nbsp;</p></div>
+                <div class="col g-0">
+                    <p>
+                        <button class="noStyle" onclick="toggleCardFormVisibility()"><img src="icons/createCard.png"></button>
+                        <a href="/login.html" id="signOutLink">Sign out</a>
+                    </p>
+                </div>
+            </div>
+        </header>
+        
+        <div class="container g-0">
+            <div class="row g-0"> 
+                <!--MAIN PANEL-->
+                <div class="col-8 g-0" id="main-panel">
+                    <div id="main-container" class="container g-0">
+                        <!--DYNAMIC MAIN CONTENT-->
+                    </div>
+                </div>
+
+                <div class="col g-0">
+                    <div class="container g-0 users-row">
+                        <div class="row g-0">
+                            <div class="col g-0 list-header">People you know</div>
+                            <div class="col g-0 list-header">Explore</div>
+                        </div>
+                        <div class="row g-0 users-row">
+                            <div class="col g-0">
+                                <ul id="following-list" class="lists">
+                                    <!--USERS FOLLOWED BY USER-->
+                                </ul>
+                            </div>
+                            <div class="col g-0">
+                                <ul id="explore-list" class="lists">  
+                                    <!--NEW RECOMMNEDATIONS FOR THE USER-->         
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+
+    <script>
+
+        function loadBody(){
+            if (getCookie("username")=="" || getCookie("token")==""){
+                window.location.href = "http://localhost:8080/"
+            } else{
+                let username = getCookie('username')
+                username = removeQuotationMarks(username)
+
+                let token = getCookie('token')
+                let user = {username: username, token:token};
+
+                updateCardFormAuthor(username, token)
+                updateUsername(user.username)
+                updateMainContent(user)
+            }
+        }
+
+        function updateCardFormAuthor(username, token){
+            document.getElementById("author").value = username
+            document.getElementById("session").value = token
+        }
+        
+        function toggleCardFormVisibility(){
+            collection = document.getElementsByClassName("visible")
+            
+            if (collection.length > 0){
+                collection.item(0).classList.replace("visible", "hidden")
+            } else{
+                collection = document.getElementsByClassName("hidden")
+                collection.item(0).classList.replace("hidden", "visible")
+            }
+        }
+
+        function likeCard(cardId){
+            let username = getCookie('username')
+            username = removeQuotationMarks(username)
+            let token = getCookie('token')
+            let user = {username: username, token:token};
+
+            sendCardLikeRequest(user, cardId)
+        }
+
+        function likeComment(commentId){
+            let username = getCookie('username')
+            username = removeQuotationMarks(username)
+            let token = getCookie('token')
+            let user = {username: username, token:token};
+
+            sendCommentLikeRequest(user, commentId)
+        }
+
+        
+        function follow(userToFollow){
+            let username = getCookie('username')
+            username = removeQuotationMarks(username)
+            let token = getCookie('token')
+            let user = {username: username, token:token};
+            
+            sendFollowRequest(user, userToFollow)
+        }
+        
+        function unfollow(userToFollow){
+            let username = getCookie('username')
+            username = removeQuotationMarks(username)
+            let token = getCookie('token')
+            let user = {username: username, token:token};
+            
+            sendUnfollowRequest(user, userToFollow)
+        }
+        
+        function sendFollowRequest(user, userToFollow){
+            fetch("/home", {
+                method: "PUT",
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({action:"follow", user_credentials:user, target:userToFollow})
+            })
+            
+            .then(data=>{
+                console.log(data)
+                location.reload()
+            })
+        }
+            
+        function sendUnfollowRequest(user, userToFollow){
+            fetch("/home", {
+                 method: "DELETE",
+                headers: {'Content-Type': 'application/json'}, 
+                 body: JSON.stringify({action:"unfollow", user_credentials:user, target:userToFollow})
+            })
+             .then(data=>{
+                 console.log(data)
+                location.reload()
+            })
+        }
+
+        function sendCardLikeRequest(user, cardId){
+            fetch("/home", {
+                method: "PUT",
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({action:"likeCard", user_credentials:user, target:cardId.toString()})
+            })
+
+            .then(response=>{
+                return response.json()
+            })
+
+            .then(data=>{
+                document.getElementById("likeCardRow"+cardId+"").innerHTML = "<button class=\"noStyle\" onclick=\"likeCard("+ cardId+")\"><img "+getButtonImgSrcByLiked(data.liked)+"></button>" + "<span class=\"cardLikes\">"+data.likes+"</span>"
+            }) 
+        }
+
+        function sendCommentLikeRequest(user, commentId){
+            fetch("/home", {
+                method: "PUT",
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({action:"likeComment", user_credentials:user, target:commentId.toString()})
+            })  
+
+            .then(response=>{
+                return response.json()
+            })
+
+            .then(data=>{
+                document.getElementById("likeCommentRow"+commentId+"").innerHTML = "<button class=\"noStyle\" onclick=\"likeComment("+commentId+")\"><img "+getButtonImgSrcByLiked(data.liked)+"></button>" + "<span class=\"cardLikes\">"+data.likes+"</span>"
+            }) 
+        }
+            
+        function updateMainContent(user){
+            fetch("/home", {
+            method: "POST",
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({action:"onLoad", user_credentials:user, target:""})
+            })
+            .then(response=>{
+                return response.json()
+            })
+            .then(data=>{
+                selectAppendExploreList(data[0])
+                selectAppendFollowingList(data[1])
+                var CardPositionInData = 2
+                for(var i=CardPositionInData; i<data.length;i++){
+                    selectAppendCard(data[i])
+                }
+            })
+        }
+
+        function selectAppendCard(card){
+            if (isNotErrorMessage(card) && card !=null && card.card_id != null){
+                cardArticle = document.createElement("article");
+                cardArticle.classList.add("articleCard")
+                cardArticle.innerHTML = getCardHTML(card);
+                document.getElementById("main-container").appendChild(cardArticle)
+            } 
+        }
+
+        function getCardHTML(card){
+            let username = getCookie('username')
+            username = removeQuotationMarks(username)
+
+            article = "<div class=\"row justify-content-center g-0\"><div class=\"col-6 g-0 align-self-center main-article-col\">"
+            article += getDivHTML("cardAuthor", card.author)
+            article += "<div><img class=\"cardImg\" src=\""+card.image+"\" onerror=\"this.onerror=null;this.src='default-image.jpg';\"></div>"
+            article += "<span id=\"likeCardRow"+card.card_id+"\"><button class=\"noStyle\" onclick=\"likeCard("+ card.card_id+")\"><img "+getButtonImgSrcByLiked(card.liked)+"></button>" + "<span class=\"cardLikes\">"+card.likes+"</span></span>"
+            article += getDivHTML("cardDescription", card.description)  
+            article += getDivHTML("createCommentForm", "<form method=\"POST\" action=\"/home/card/comment\"><input type=\"hidden\" name=\"cardId\" value=\""+card.card_id+"\"><input type=\"hidden\" name=\"author\" value=\""+username+"\"><input type=\"text\" name=\"body\" placeholder=\"Add a comment...\"><input type=\"submit\" value=\"submit\"></form>")
+            if(getComments(card)!=undefined){
+                article += getComments(card)
+            }
+            
+            article += "</div></div>"
+            return article
+        }
+
+        function createComment(cardId){
+            alert(cardId)
+        }
+
+        function getButtonImgSrcByLiked(liked){
+            if(liked){
+                return "src=\"icons\\like.png\""
+            }
+            return "src=\"icons\\dislike.png\""
+        }
+        
+        function getComments(card){
+            toReturn = ""
+            
+            if(card.Comments==null){
+                return
+            }
+
+            for(i=0;i<card.Comments.length; i++){
+                toReturn += "<div class=\"commentRow\">" + getSpanHTML("commentAuthor", card.Comments[i].author)
+                toReturn += getSpanHTML("commentBody", card.Comments[i].body)
+                toReturn += "<span id=\"likeCommentRow"+card.Comments[i].comment_id+"\">" + getSpanHTML("commentButton", "<button class=\"noStyle\" onclick=\"likeComment("+ card.Comments[i].comment_id+")\"><img "+getButtonImgSrcByLiked(card.Comments[i].liked)+"\"></button>") + getSpanHTML("commentLikes", card.Comments[i].likes) + "</span></div>"
+            }
+            return toReturn
+        }
+        
+        function getDivHTML(divClass, content){
+            return "<div class=\""+ divClass +"\">"+ content + "</div>"
+        }
+        function getSpanHTML(spanClass, content){
+            return "<span class=\""+ spanClass +"\">"+ content + "</span>"
+        }
+
+        function selectAppendFollowingList(users){
+            if (isNotErrorMessage(users) && users.relation == "following"){
+                for (index = 0; index < users.user_list.length; index++) {
+                   friendItem = document.createElement("li");
+                   friendItem.innerHTML = users.user_list[index] + "<button style=\"float:right;\" class=\"noStyle\" onclick=\"unfollow(&quot;"+users.user_list[index]+"&quot;)\"><img src=\"icons\\like.png\" width=\"16px\" height=\"16px\"></button>";
+                   document.getElementById("following-list").appendChild(friendItem)
+                }}else{
+                    console.log(users.content)
+                }
+        }
+
+        function selectAppendExploreList(users){
+            if (isNotErrorMessage(users) && users.relation == "explore"){
+                for (index = 0; index < users.user_list.length; index++) {
+                   friendItem = document.createElement("li");
+                   friendItem.innerHTML = users.user_list[index] + "<button style=\"float:right;\" class=\"noStyle\" onclick=\"follow(&quot;"+users.user_list[index]+"&quot;)\"><img src=\"icons\\dislike.png\" width=\"16px\" height=\"16px\"></button>";
+                   document.getElementById("explore-list").appendChild(friendItem)
+                }}else{
+                    console.log(users.content)
+                }
+        }
+
+        function isNotErrorMessage(data){
+            return data.category == null && data.category != "error"
+        }
+
+        function updateUsername(username){
+            document.getElementById("username").innerHTML = "Welcome back, "+username+"!"
+        }
+
+        function getCookie(cname) {
+            let name = cname + "=";
+            let decodedCookie = decodeURIComponent(document.cookie);
+            let ca = decodedCookie.split(';');
+            for(let i = 0; i <ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') {
+                c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                return c.substring(name.length, c.length);
+                }
+            }
+            return "";
+        }
+
+        function removeQuotationMarks(username){
+            if(username.charAt(0)=="\"" && username.charAt(username.length-1)=="\""){
+                return username.slice(1, username.length-1)
+            } else{
+                return username
+            }
+        }
+    </script>
+</html>
